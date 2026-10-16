@@ -28,6 +28,26 @@ def test_encode_token_embeddings(stsb_bert_tiny_model: SentenceTransformer) -> N
         assert len(model.preprocess([s])["input_ids"][0]) == e.shape[0]
 
 
+def test_encode_token_embeddings_convert_to_numpy(stsb_bert_tiny_model: SentenceTransformer) -> None:
+    """Regression for #3185: convert_to_numpy must apply to token_embeddings."""
+    import torch
+
+    model = stsb_bert_tiny_model
+    single = model.encode("Hello World", output_value="token_embeddings", convert_to_numpy=True)
+    assert isinstance(single, np.ndarray)
+    assert single.ndim == 2
+
+    batch = model.encode(
+        ["Hello World", "Another longer sentence here"],
+        output_value="token_embeddings",
+        convert_to_numpy=True,
+        batch_size=2,
+    )
+    assert isinstance(batch, list)
+    assert all(isinstance(e, np.ndarray) for e in batch)
+    assert all(not isinstance(e, torch.Tensor) for e in batch)
+
+
 def test_encode_single_sentences(stsb_bert_tiny_model: SentenceTransformer) -> None:
     model = stsb_bert_tiny_model
     dimension = model.get_embedding_dimension()

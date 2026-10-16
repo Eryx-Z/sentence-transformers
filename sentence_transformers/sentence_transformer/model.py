@@ -838,9 +838,11 @@ class SentenceTransformer(BaseModel, FitMixin):
         if convert_to_tensor:
             convert_to_numpy = False
 
+        # Token embeddings (and output_value=None dicts) have per-input variable length, so a
+        # stacked Tensor is not always possible. Still honor convert_to_numpy so callers get
+        # ndarrays (or a list of them) instead of silently ignoring the flag (#3185).
         if output_value != "sentence_embedding":
             convert_to_tensor = False
-            convert_to_numpy = False
 
         if batch_size <= 0:
             raise ValueError(f"batch_size must be a positive integer, got {batch_size}.")
@@ -907,6 +909,8 @@ class SentenceTransformer(BaseModel, FitMixin):
                 all_embeddings = np.array([])
             elif isinstance(all_embeddings, Tensor):
                 all_embeddings = _tensor_to_numpy(all_embeddings)
+            elif isinstance(all_embeddings, list) and all_embeddings and isinstance(all_embeddings[0], Tensor):
+                all_embeddings = [_tensor_to_numpy(emb) for emb in all_embeddings]
         else:
             all_embeddings = list(
                 torch.from_numpy(all_embeddings) if isinstance(all_embeddings, np.ndarray) else all_embeddings
