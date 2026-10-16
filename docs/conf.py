@@ -109,11 +109,29 @@ html_js_files = [
 ]
 
 html_show_sourcelink = False
+def _github_ref() -> str:
+    """Git ref used for [source] / download links.
+
+    Prefer the installed package version tag (``vX.Y.Z``) so documentation built
+    for a release keeps pointing at matching source lines. Fall back to ``main``
+    for development builds (``*.dev*``) and missing tags (#4074).
+    """
+    try:
+        from sentence_transformers import __version__ as package_version
+    except Exception:
+        return "main"
+    if "dev" in package_version:
+        return "main"
+    return f"v{package_version}"
+
+
+_GITHUB_REF = _github_ref()
+
 html_context = {
     "display_github": True,
     "github_user": "huggingface",
     "github_repo": "sentence-transformers",
-    "github_version": "main/",
+    "github_version": f"{_GITHUB_REF}/",
 }
 
 html_logo = "img/logo.png"
@@ -159,11 +177,11 @@ def linkcode_resolve(domain, info):
         return None
     start, end = lines[1], lines[1] + len(lines[0]) - 1
 
-    return f"https://github.com/huggingface/sentence-transformers/blob/main/{file}#L{start}-L{end}"
+    return f"https://github.com/huggingface/sentence-transformers/blob/{_GITHUB_REF}/{file}#L{start}-L{end}"
 
 
 def visit_download_reference(self, node):
-    root = "https://github.com/huggingface/sentence-transformers/tree/main"
+    root = f"https://github.com/huggingface/sentence-transformers/tree/{_GITHUB_REF}"
     atts = {"class": "reference download", "download": ""}
 
     if not self.builder.download_support:
