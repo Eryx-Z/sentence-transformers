@@ -29,8 +29,13 @@ Architecture variants:
 - Bi-encoder (this script): `TaskType.FEATURE_EXTRACTION`.
 - Sparse-encoder: same pattern. `SparseEncoder` supports `add_adapter`. See
   `examples/sparse_encoder/training/peft/train_splade_gooaq_peft.py`.
-- Cross-encoder: use `TaskType.SEQ_CLS` for `num_labels >= 1`. Community
-  examples are sparse. Smoke-test with `max_steps=1` first.
+- Cross-encoder / reranker: use `CrossEncoder.add_adapter(...)` with
+  `TaskType.SEQ_CLS` (and `modules_to_save=["classifier"]` / `["score"]` when
+  you want the classification head trained). Do **not** replace
+  `model.model = get_peft_model(model.model, ...)` — that path feeds a
+  BatchEncoding positionally into PeftModel and raises
+  `TypeError: embedding(): ... must be Tensor, not BatchEncoding` (#3916).
+  Smoke-test with `max_steps=1` first.
 
 Key hyperparameters:
 - `r` (rank): 8-128. Bigger = more capacity + memory. 64 is a strong default.

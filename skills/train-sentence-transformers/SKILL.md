@@ -36,6 +36,7 @@ Tiebreakers when the request is ambiguous: "embedding model" / "vector search" /
 - `references/losses_cross_encoder.md`: pointwise / pairwise / listwise / distillation, `pos_weight` derivation, `activation_fn=Identity()` mandatory for non-BCE losses (silent eval-rank collapse otherwise).
 - `references/evaluators_cross_encoder.md`: `CrossEncoderRerankingEvaluator` recipe, named-evaluator key format `eval_{name}_{primary_metric}`.
 - `scripts/train_cross_encoder_example.py`: production template. Copy this as your starting point.
+- LoRA / PEFT: use `CrossEncoder.add_adapter(...)` with `TaskType.SEQ_CLS` (see CrossEncoder note in `scripts/train_sentence_transformer_with_lora_example.py` and the troubleshooting entry for the unsupported `model.model = get_peft_model(...)` pattern).
 
 **[SparseEncoder]**
 - `references/losses_sparse_encoder.md`: `SpladeLoss` wrapper requirement, FLOPS regularizer weights, smoke-test active-dim ramp behavior.

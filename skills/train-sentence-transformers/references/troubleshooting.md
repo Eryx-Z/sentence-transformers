@@ -205,6 +205,33 @@ ImportError: Module "__main__" does not define a "ClassifierHead" attribute
 
 **Fix:** run `accelerate config` first, set number of GPUs and precision. Or pass explicitly: `accelerate launch --multi_gpu --num_processes=4 train.py`.
 
+
+## CrossEncoder LoRA: `TypeError: embedding(): ... must be Tensor, not BatchEncoding`
+
+**Symptom:** training a `CrossEncoder` after `model.model = get_peft_model(model.model, peft_config)` crashes on the first step with a Tensor/BatchEncoding type error deep in `F.embedding`.
+
+**Root cause:** `BaseModel.forward` calls submodules positionally with a BatchEncoding/dict. A top-level `PeftModel` expects named kwargs (`input_ids=...`), so the whole dict is bound to `input_ids`.
+
+**Fix:** use the supported adapter API instead of wrapping the top-level module:
+
+```python
+from peft import LoraConfig, TaskType
+from sentence_transformers import CrossEncoder
+
+model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L6-v2")
+model.add_adapter(
+    LoraConfig(
+        task_type=TaskType.SEQ_CLS,
+        r=16,
+        lora_alpha=32,
+        target_modules=["query", "value"],  # or model-specific proj names
+        modules_to_save=["classifier"],  # train the classification head
+    )
+)
+```
+
+`add_adapter` wraps the inner transformers model, so the ST forward pipeline stays intact. See also the CrossEncoder note in `../scripts/train_sentence_transformer_with_lora_example.py`.
+
 ## Cached loss + PEFT adapter fails to backprop
 
 **Symptom:** "None of the inputs have requires_grad=True" when using Cached* loss with a LoRA adapter.
