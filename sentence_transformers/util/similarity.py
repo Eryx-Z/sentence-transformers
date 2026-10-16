@@ -772,8 +772,10 @@ def _pad_multi_vector_inputs(
 
 def pairwise_angle_sim(x: list | np.ndarray | Tensor, y: list | np.ndarray | Tensor) -> Tensor:
     """
-    Computes the absolute normalized angle distance. See :class:`~sentence_transformers.sentence_transformer.losses.AnglELoss`
-    or https://huggingface.co/papers/2309.12871 for more information.
+    Computes the absolute AnglE similarity: ``|cos_sim(x, y) + sin_sim(x, y)|`` after L2
+    normalization. Dimensions ``i`` and ``i + D/2`` are paired for the sine term. See
+    :class:`~sentence_transformers.sentence_transformer.losses.AnglELoss` or
+    https://huggingface.co/papers/2309.12871 for more information.
 
     Args:
         x (Union[list, np.ndarray, Tensor]): The first tensor.
@@ -797,22 +799,15 @@ def pairwise_angle_sim(x: list | np.ndarray | Tensor, y: list | np.ndarray | Ten
         x = torch.nn.functional.pad(x, (0, 1), mode="constant", value=0)
         y = torch.nn.functional.pad(y, (0, 1), mode="constant", value=0)
 
-    # modified from https://github.com/SeanLee97/AnglE/blob/main/angle_emb/angle.py
-    # chunk both tensors to obtain complex components
-    a, b = torch.chunk(x, 2, dim=1)
-    c, d = torch.chunk(y, 2, dim=1)
-
-    z = torch.sum(c**2 + d**2, dim=1, keepdim=True)
-    re = (a * c + b * d) / z
-    im = (b * c - a * d) / z
-
-    dz = torch.sum(a**2 + b**2, dim=1, keepdim=True) ** 0.5
-    dw = torch.sum(c**2 + d**2, dim=1, keepdim=True) ** 0.5
-    re /= dz / dw
-    im /= dz / dw
-
-    norm_angle = torch.sum(torch.concat((re, im), dim=1), dim=1)
-    return torch.abs(norm_angle)
+    # Equivalent to the complex-chunk form from https://github.com/SeanLee97/AnglE,
+    # rewritten as cosine + sine similarity after L2 normalization (see #3223).
+    normalized_x = torch.nn.functional.normalize(x, p=2, dim=1)
+    normalized_y = torch.nn.functional.normalize(y, p=2, dim=1)
+    cosines = torch.sum(normalized_x * normalized_y, dim=1)
+    first_x, last_x = torch.chunk(normalized_x, 2, dim=1)
+    first_y, last_y = torch.chunk(normalized_y, 2, dim=1)
+    sines = torch.sum(last_x * first_y - first_x * last_y, dim=1)
+    return torch.abs(cosines + sines)
 
 
 class SimilarityFunction(Enum):

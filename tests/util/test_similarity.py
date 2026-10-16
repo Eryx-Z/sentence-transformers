@@ -456,6 +456,62 @@ def test_pairwise_angle_sim_even_and_odd_sparse_embeddings(splade_bert_tiny_mode
     assert torch.allclose(sim_even, sim_odd, rtol=1e-5, atol=1e-5)
 
 
+def _pairwise_angle_sim_legacy(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    """Pre-#3223 complex-chunk implementation, kept for numerical/gradient parity checks."""
+    if x.shape[1] % 2 != 0:
+        x = torch.nn.functional.pad(x, (0, 1), mode="constant", value=0)
+        y = torch.nn.functional.pad(y, (0, 1), mode="constant", value=0)
+
+    a, b = torch.chunk(x, 2, dim=1)
+    c, d = torch.chunk(y, 2, dim=1)
+
+    z = torch.sum(c**2 + d**2, dim=1, keepdim=True)
+    re = (a * c + b * d) / z
+    im = (b * c - a * d) / z
+
+    dz = torch.sum(a**2 + b**2, dim=1, keepdim=True) ** 0.5
+    dw = torch.sum(c**2 + d**2, dim=1, keepdim=True) ** 0.5
+    re /= dz / dw
+    im /= dz / dw
+
+    norm_angle = torch.sum(torch.concat((re, im), dim=1), dim=1)
+    return torch.abs(norm_angle)
+
+
+@pytest.mark.parametrize("dim", [4, 8, 64, 7, 9])
+def test_pairwise_angle_sim_matches_legacy_values(dim: int) -> None:
+    """Clearer cos+sin form must match the previous complex-chunk outputs (#3223)."""
+    generator = torch.Generator().manual_seed(0)
+    x = torch.randn(32, dim, generator=generator)
+    y = torch.randn(32, dim, generator=generator)
+
+    torch.testing.assert_close(
+        pairwise_angle_sim(x, y),
+        _pairwise_angle_sim_legacy(x, y),
+        rtol=1e-5,
+        atol=1e-5,
+    )
+
+
+@pytest.mark.parametrize("dim", [4, 8, 64, 7, 9])
+def test_pairwise_angle_sim_matches_legacy_gradients(dim: int) -> None:
+    """Gradients w.r.t. both inputs must match the previous implementation (#3223)."""
+    generator = torch.Generator().manual_seed(1)
+    x = torch.randn(16, dim, generator=generator)
+    y = torch.randn(16, dim, generator=generator)
+
+    x_new = x.clone().requires_grad_(True)
+    y_new = y.clone().requires_grad_(True)
+    x_old = x.clone().requires_grad_(True)
+    y_old = y.clone().requires_grad_(True)
+
+    pairwise_angle_sim(x_new, y_new).sum().backward()
+    _pairwise_angle_sim_legacy(x_old, y_old).sum().backward()
+
+    torch.testing.assert_close(x_new.grad, x_old.grad, rtol=1e-5, atol=1e-5)
+    torch.testing.assert_close(y_new.grad, y_old.grad, rtol=1e-5, atol=1e-5)
+
+
 LOW_PRECISION_DTYPES = [torch.float16, torch.bfloat16]
 
 
