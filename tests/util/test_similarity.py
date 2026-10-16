@@ -512,6 +512,36 @@ def test_pairwise_angle_sim_matches_legacy_gradients(dim: int) -> None:
     torch.testing.assert_close(y_new.grad, y_old.grad, rtol=1e-5, atol=1e-5)
 
 
+def test_pairwise_angle_sim_not_slower_than_legacy() -> None:
+    """Cos+sin rewrite should not be slower than the complex-chunk form on CPU (#3223).
+
+    Reproducible microbenchmark (1 thread, median of 50 timed calls after warmup).
+    Soft bound only — readability is the main goal; speed is a bonus when it holds.
+    """
+    import statistics
+    import time
+
+    torch.set_num_threads(1)
+    generator = torch.Generator().manual_seed(0)
+    x = torch.randn(1024, 768, generator=generator)
+    y = torch.randn(1024, 768, generator=generator)
+
+    def _median_ms(fn, reps: int = 50, warmup: int = 10) -> float:
+        for _ in range(warmup):
+            fn(x, y)
+        samples = []
+        for _ in range(reps):
+            t0 = time.perf_counter()
+            fn(x, y)
+            samples.append((time.perf_counter() - t0) * 1000)
+        return statistics.median(samples)
+
+    legacy_ms = _median_ms(_pairwise_angle_sim_legacy)
+    new_ms = _median_ms(pairwise_angle_sim)
+    # Generous bound to avoid CI flake; local 1-thread runs were ~1.2–1.9x faster.
+    assert new_ms <= legacy_ms * 1.5, f"new={new_ms:.3f}ms legacy={legacy_ms:.3f}ms"
+
+
 LOW_PRECISION_DTYPES = [torch.float16, torch.bfloat16]
 
 
