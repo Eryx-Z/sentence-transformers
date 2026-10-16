@@ -36,6 +36,44 @@ def test_loads_with_default_modules() -> None:
     assert model.get_embedding_dimension() == model[1].out_features
 
 
+def test_query_document_length_constructor_and_properties() -> None:
+    """Constructor kwargs and properties set Transformer query/document lengths without model[0]."""
+    base = "sentence-transformers-testing/stsb-bert-tiny-safetensors"
+    model = MultiVectorEncoder(base, query_length=5, document_length=9)
+    assert model.query_length == 5
+    assert model.document_length == 9
+    assert model[0].query_length == 5
+    assert model[0].document_length == 9
+
+    # Property setters mirror max_seq_length and update the backbone module.
+    model.query_length = 7
+    model.document_length = 11
+    assert model[0].query_length == 7
+    assert model[0].document_length == 11
+
+    # Encode paths honor the overridden lengths (truncation/padding to task max).
+    query = "What is the capital city of the country of France in Europe today"
+    doc = (
+        "The city of Paris has served as the capital of France for many centuries, "
+        "and it is well known for the Eiffel Tower, the Louvre museum, and the river Seine "
+        "which flows through the heart of the city."
+    )
+    q_emb = model.encode_query([query])[0]
+    d_emb = model.encode_document([doc])[0]
+    assert q_emb.shape[0] <= 7
+    assert d_emb.shape[0] <= 11
+
+
+def test_query_document_length_none_keeps_checkpoint_defaults() -> None:
+    model = MultiVectorEncoder(
+        "sentence-transformers-testing/stsb-bert-tiny-safetensors",
+        query_length=None,
+        document_length=None,
+    )
+    assert model.query_length is None
+    assert model.document_length is None
+
+
 def test_default_colbert_attributes() -> None:
     model = MultiVectorEncoder("sentence-transformers-testing/stsb-bert-tiny-safetensors")
     transformer = model[0]
