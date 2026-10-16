@@ -64,6 +64,24 @@ def test_query_document_length_constructor_and_properties() -> None:
     assert d_emb.shape[0] <= 11
 
 
+
+
+def test_shorter_query_length_caps_token_count() -> None:
+    """Property updates must change encode_query truncation the same way constructor kwargs do."""
+    base = "sentence-transformers-testing/stsb-bert-tiny-safetensors"
+    query = (
+        "What is the capital city of the country of France in Europe today "
+        "and which river flows through that city"
+    )
+    model = MultiVectorEncoder(base, query_length=4)
+    short = model.encode_query([query])[0]
+    model.query_length = 16
+    longer = model.encode_query([query])[0]
+    assert short.shape[0] <= 4
+    assert longer.shape[0] <= 16
+    assert short.shape[0] <= longer.shape[0]
+
+
 def test_query_document_length_none_keeps_checkpoint_defaults() -> None:
     model = MultiVectorEncoder(
         "sentence-transformers-testing/stsb-bert-tiny-safetensors",
