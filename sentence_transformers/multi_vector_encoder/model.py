@@ -235,6 +235,14 @@ class MultiVectorEncoder(BaseModel):
 
     @query_length.setter
     def query_length(self, value: int | None) -> None:
+        expansion = getattr(self[0], "query_expansion", None)
+        if value is not None and expansion is not None and value < expansion["length"]:
+            raise ValueError(
+                f"query_length={value} is smaller than query_expansion['length']={expansion['length']}. "
+                "The expansion length is the query width floor, so a smaller query_length cap is "
+                "contradictory. Drop query_length, raise it to at least the expansion length, or lower "
+                "the expansion length."
+            )
         self[0].query_length = value
 
     @property

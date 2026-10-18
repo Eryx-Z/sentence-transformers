@@ -65,6 +65,15 @@ def test_query_document_length_constructor_and_properties() -> None:
 
 
 
+def test_query_length_setter_rejects_below_expansion_length() -> None:
+    """Outer query_length setter must not bypass backbone expansion floor validation."""
+    model = MultiVectorEncoder("sentence-transformers-testing/stsb-bert-tiny-safetensors")
+    model[0].query_expansion = {"strategy": "fixed", "length": 16}
+    with pytest.raises(ValueError, match="smaller than query_expansion"):
+        model.query_length = 5
+    model.query_length = 16
+    assert model.query_length == 16
+
 
 def test_shorter_query_length_caps_token_count() -> None:
     """Property updates must change encode_query truncation the same way constructor kwargs do."""
